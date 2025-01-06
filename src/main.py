@@ -1,5 +1,6 @@
 import dearpygui.dearpygui as dpg
 import DearPyGui_DragAndDrop as dpg_dnd
+import webbrowser
 from merger import merge_pdfs
 
 class App:
@@ -39,12 +40,20 @@ class App:
 
     def merge_pdfs(self, sender, app_data):
         if self.output_folder == "":
-            print("Output folder not set")
+            self.show_error("Output folder not set")
             return
         if len(self.file_list) < 2:
-            print("Not enough files to merge")
+            self.show_error("Not enough files to merge")
             return
+        for file in self.file_list:
+            if not file.endswith(".pdf"):
+                self.show_error("Only PDF files can be merged")
+                return
         merge_pdfs(self.file_list, self.output_folder + "\\merged.pdf")
+
+    def show_error(self, message):
+        dpg.set_value("error_text", message)
+        dpg.configure_item("error_modal_id", show=True)
 
     def init_windows(self):
 
@@ -73,16 +82,48 @@ class App:
         dpg.add_file_dialog(directory_selector=True, show=False, callback=folder_pick_call, tag="folder_dialog_id", width=400, height=500)
 
         with dpg.window(label="PDF Merge") as main_window:
+
+            with dpg.menu_bar():
+                with dpg.menu(label="Help"):
+                    dpg.add_menu_item(label="How to use", callback=lambda: dpg.configure_item("howto_modal_id", show=True))
+                    dpg.add_menu_item(label="About", callback=lambda: dpg.configure_item("about_modal_id", show=True))
+
             dpg.add_text("Files to merge:")
-            with dpg.child_window(tag="file_registry", autosize_x=True, height=200):
+            with dpg.child_window(tag="file_registry", autosize_x=True, height=400):
                 dpg_dnd.set_drop(self.drop)
             dpg.add_button(label="Merge PDFs", callback=self.merge_pdfs)
             # add button to show folder picker dialog
             dpg.add_button(label="Set output Folder", callback=show_folder_picker)
             dpg.add_text("Output folder: Not picked!!", tag="out_f_text")
             
+            with dpg.popup(dpg.last_item(), mousebutton=dpg.mvMouseButton_Left, modal=True, tag="howto_modal_id"):
+                dpg.add_text("1. To merge PDFs, drag and drop the files in the window.\n\tYou can also use the 'Add PDF' button to select files.\n")
+                dpg.add_text("2. To change the order of the files, use the 'Up' button\n\tto move the file upwards in the final document.\n\tThe file order represents the document order in the final document\n")
+                dpg.add_text("3. To remove a file from the list, use the 'Remove' button.\n")
+                dpg.add_text("4. To set the output folder, click the 'Set output Folder' button.\n\tNote that the will be shown right bellow this button.\n\tThe output file will be named 'merged.pdf'\n\tand will be placed in the chosed folder.\n\tThe folder must be selected before merging.\n")
+                dpg.add_text("5. To merge the PDFs, click the 'Merge PDFs' button.\n")
+                dpg.add_text("6. If you like the app, consider supporting the project\n\tby clicking the button below.\n")
+                # vertical space
+                dpg.add_text("")
+                dpg.add_separator()
+                dpg.add_text("")
+
+                dpg.add_button(label="Support the project", callback=lambda: webbrowser.open("https://example.com"))
+                dpg.configure_item("howto_modal_id", pos=(dpg.get_viewport_width() // 2 - 260, dpg.get_viewport_height() // 2 - 200))
+
+            with dpg.popup(dpg.last_item(), mousebutton=dpg.mvMouseButton_Left, modal=True, tag="about_modal_id"):
+                dpg.add_text("PDF Merger v1.0")
+                dpg.add_text("Developed by: Vojtech Coupek")
+                dpg.add_text("Used packages: PyPDF2, DearPyGui")
+                dpg.configure_item("about_modal_id", pos=(dpg.get_viewport_width() // 2 - 200, dpg.get_viewport_height() // 2 - 100))
+
+            with dpg.popup(dpg.last_item(), mousebutton=dpg.mvMouseButton_Left, modal=True, tag="error_modal_id"):
+                dpg.add_text("Error occurred", tag="error_text")
+                dpg.configure_item("error_modal_id", pos=(dpg.get_viewport_width() // 2 - 150, dpg.get_viewport_height() // 2 - 100))
+
             dpg.set_primary_window(main_window, True)
             self.draw_file_registry()
+
 
     def drop(self, data, keys):
         for file in data:
