@@ -1,12 +1,15 @@
 import argparse
-from PyPDF2 import PdfMerger
+from PyPDF2 import PdfReader, PdfWriter
 
-def merge_pdfs(pdf_list, output):
-    merger = PdfMerger()
-    for pdf in pdf_list:
-        merger.append(pdf)
-    merger.write(output)
-    merger.close()
+def merge_pdfs(input_paths, output_path, pages):
+    pdf_writer = PdfWriter()
+    for path, pgs in zip(input_paths, pages):
+        pdf_reader = PdfReader(path)
+        for page in range(len(pdf_reader.pages)):
+            if pgs == "All" or page in pgs:
+                pdf_writer.add_page(pdf_reader.pages[page])
+    with open(output_path, 'wb') as fh:
+        pdf_writer.write(fh)
 
 def main():
     parser = argparse.ArgumentParser(description="Merge PDF files into a single PDF.")
