@@ -3,6 +3,12 @@ import DearPyGui_DragAndDrop as dpg_dnd
 import webbrowser
 from merger import merge_pdfs
 import json
+import subprocess
+import sys
+import os
+import tempfile
+from tkinter.filedialog import askdirectory, askopenfilenames
+import re
 
 class App:
 
@@ -58,7 +64,17 @@ class App:
             
         # function to show file picker dialog
         def show_file_picker(sender):
-            dpg.show_item("file_dialog_id")
+            filetypes = (
+                ('Pdf files', '*.pdf'),)
+            
+            filenames = askopenfilenames(
+                title='Open a file',
+                initialdir='/',
+                filetypes=filetypes)
+
+            for file in filenames:
+                self.add_pdf(file)
+            
         dpg.add_button(label="Add PDF", callback=show_file_picker, parent="file_registry")
 
     def move_pdf_up(self, sender, app_data, user_data):
@@ -104,9 +120,13 @@ class App:
         return f_pages
 
     def merge_pdfs(self, sender, app_data):
-        if self.output_folder == "":
-            self.show_error("Output folder not set")
-            return
+        out_f = tempfile.gettempdir() if self.output_folder == "" else self.output_folder
+
+        regex = re.compile(r'merged(\d*)\.pdf')
+        matching_files = [f for f in os.listdir(out_f) if regex.match(f)]
+        number = max([int(regex.match(f).group(1)) for f in matching_files if regex.match(f).group(1).isdigit()], default=0) + 1
+        target_file = os.path.join(out_f, f"merged{number}.pdf")
+
         if len(self.file_list) < 2:
             self.show_error("Not enough files to merge")
             return
@@ -117,7 +137,9 @@ class App:
         f_pages = self.process_f_pages()
         if f_pages == []:
             return
-        merge_pdfs(self.file_list, self.output_folder + "\\merged.pdf", f_pages)
+        merge_pdfs(self.file_list, target_file, f_pages)
+        if self.output_folder == "":
+            subprocess.Popen([target_file],shell=True)
 
     def show_error(self, message):
         dpg.set_value("error_text", message)
@@ -126,7 +148,9 @@ class App:
     def init_windows(self):
 
         def show_folder_picker(sender):
-            dpg.show_item("folder_dialog_id")
+            self.output_folder = askdirectory(title='Select Folder')
+            dpg.set_value("out_f_text", "Output folder: " + self.output_folder)
+            self.save_output_folder()
 
         dpg.create_context()
         dpg_dnd.initialize()
@@ -135,26 +159,21 @@ class App:
         def file_pick_call(sender, app_data):
             for file_path in app_data['selections'].values():
                 self.add_pdf(file_path)
-        
-        def folder_pick_call(sender, app_data):
-            if app_data['selections'].values() == []:
-                return
-            self.output_folder = app_data['file_path_name']
-            print(app_data)
-            dpg.set_value("out_f_text", "Output folder: " + self.output_folder)
-            self.save_output_folder()
+
+        if hasattr(sys, '_MEIPASS'):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.abspath(".")
 
         with dpg.texture_registry():
-            width, height, channels, data = dpg.load_image("img/trashcan.png")
+            width, height, channels, data = dpg.load_image(os.path.join(base_path, "img/trashcan.png"))
             dpg.add_static_texture(width, height, data, tag="trashcan_icon")
-            width, height, channels, data = dpg.load_image("img/uparrow.png")
+            width, height, channels, data = dpg.load_image(os.path.join(base_path, "img/uparrow.png"))
             dpg.add_static_texture(width, height, data, tag="arrow_up_icon")
 
         # file picker dialog creation
         with dpg.file_dialog(directory_selector=False, show=False, callback=file_pick_call, tag="file_dialog_id", width=400, height=500):
             dpg.add_file_extension(".pdf", color=(0, 255, 0, 255), custom_text="[Pdf]")
-
-        dpg.add_file_dialog(directory_selector=True, show=False, callback=folder_pick_call, tag="folder_dialog_id", width=400, height=500)
 
         with dpg.window(label="PDF Merge") as main_window:
 

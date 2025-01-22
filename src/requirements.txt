@@ -1,2 +1,3 @@
 dearpygui
 DearPyGui_DragAndDrop
+PyPDF2
